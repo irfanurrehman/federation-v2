@@ -37,7 +37,6 @@ import (
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/federatedservice"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/federatedserviceplacement"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/propagatedversion"
-	"github.com/kubernetes-sigs/federation-v2/pkg/controller/replicaschedulingpreference"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/sharedinformers"
 	"k8s.io/client-go/rest"
 )
@@ -63,6 +62,5 @@ func GetAllControllers(config *rest.Config) ([]controller.Controller, chan struc
 		federatedservice.NewFederatedServiceController(config, si),
 		federatedserviceplacement.NewFederatedServicePlacementController(config, si),
 		propagatedversion.NewPropagatedVersionController(config, si),
-		replicaschedulingpreference.NewReplicaSchedulingPreferenceController(config, si),
 	}, shutdown
 }
