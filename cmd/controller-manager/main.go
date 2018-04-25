@@ -24,6 +24,7 @@ import (
 	controllerlib "github.com/kubernetes-incubator/apiserver-builder/pkg/controller"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/federatedcluster"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/sync"
+	rspcontroller "github.com/kubernetes-sigs/federation-v2/pkg/controller/replicaschedulingpreference"
 	"github.com/kubernetes-sigs/federation-v2/pkg/federatedtypes"
 )
 
@@ -52,6 +53,11 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error starting sync controller for %q: %v", kind, err)
 		}
+	}
+
+	err = rspcontroller.StartReplicaSchedulingPreferenceController(config, config, config, stopChan, true)
+	if err != nil {
+		log.Fatalf("Error starting replicaschedulingpreference controller: %v", err)
 	}
 
 	// Blockforever
