@@ -197,6 +197,7 @@ func (s *ReplicaSchedulingPreferenceController) Run(stopChan <-chan struct{}) {
 		s.workQueue.ShutDown()
 		s.deliverer.Stop()
 		s.clusterDeliverer.Stop()
+		s.scheduler.Stop()
 	}()
 }
 
