@@ -31,7 +31,7 @@ func TestIntegration(t *testing.T) {
 	defer FedFixture.TearDown(tl)
 
 	t.Run("Parallel-Integration-Test-Group", func(t *testing.T) {
-		t.Run("TestCrud", TestCrud)
+		//t.Run("TestCrud", TestCrud)
 		t.Run("TestReplicaSchedulingPreference", TestReplicaSchedulingPreference)
 	})
 }
