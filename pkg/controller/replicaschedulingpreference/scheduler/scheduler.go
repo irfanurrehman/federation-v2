@@ -29,7 +29,7 @@ import (
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util/planner"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util/podanalyzer"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,26 +43,26 @@ import (
 )
 
 const (
-	deployment = "Deployment"
-	replicaset = "ReplicaSet"
-	pod        = "Pod"
+	Deployment = "Deployment"
+	Replicaset = "ReplicaSet"
+	Pod        = "Pod"
 )
 
 var resources = map[string]metav1.APIResource{
-	deployment: {
-		Name:       strings.ToLower(deployment) + "s",
+	Deployment: {
+		Name:       strings.ToLower(Deployment) + "s",
 		Group:      appsv1.SchemeGroupVersion.Group,
 		Version:    appsv1.SchemeGroupVersion.Version,
-		Kind:       deployment,
+		Kind:       Deployment,
 		Namespaced: true,
 	},
-	replicaset: {
-		Name:       strings.ToLower(replicaset) + "s",
+	/*	Replicaset: {
+		Name:       strings.ToLower(Replicaset) + "s",
 		Group:      appsv1.SchemeGroupVersion.Group,
 		Version:    appsv1.SchemeGroupVersion.Version,
-		Kind:       replicaset,
+		Kind:       Replicaset,
 		Namespaced: true,
-	},
+	},*/
 }
 
 type SchedulerAdapter interface {
@@ -88,6 +88,7 @@ type Scheduler struct {
 func NewReplicaScheduler(fedClient fedclientset.Interface, kubeClient kubeclientset.Interface, crClient crclientset.Interface, federationEventHandler, clusterEventHandler func(pkgruntime.Object), handlers *ClusterLifecycleHandlerFuncs) *Scheduler {
 	scheduler := &Scheduler{}
 	scheduler.plugins = make(map[string]*Plugin)
+	scheduler.fedClient = fedClient
 
 	for name, apiResource := range resources {
 		scheduler.plugins[name] = NewPlugin(
@@ -110,10 +111,10 @@ func NewReplicaScheduler(fedClient fedclientset.Interface, kubeClient kubeclient
 		kubeClient,
 		crClient,
 		&metav1.APIResource{
-			Name:       strings.ToLower(pod) + "s",
+			Name:       strings.ToLower(Pod) + "s",
 			Group:      corev1.SchemeGroupVersion.Group,
 			Version:    corev1.SchemeGroupVersion.Version,
-			Kind:       pod,
+			Kind:       Pod,
 			Namespaced: true,
 		},
 		func(pkgruntime.Object) {},
@@ -169,12 +170,13 @@ func (s *Scheduler) Reconcile(fedPref *fedschedulingv1a1.ReplicaSchedulingPrefer
 		return StatusAllOK
 	}
 
-	if fedPref.Kind != deployment && fedPref.Kind != replicaset {
-		runtime.HandleError(fmt.Errorf("RSP target kind: %s is incorrect: %v", fedPref.Kind, err))
+	kind := fedPref.Spec.PreferenceTargetRef.Kind
+	if kind != Deployment && kind != Replicaset {
+		runtime.HandleError(fmt.Errorf("RSP target kind: %s is incorrect: %v", kind, err))
 		return StatusNeedsRecheck
 	}
 
-	if !s.plugins[fedPref.Kind].TemplateExists(qualifiedName.String()) {
+	if !s.plugins[kind].TemplateExists(qualifiedName.String()) {
 		// target FederatedTemplate does not exist, nothing to do
 		return StatusAllOK
 	}
@@ -186,7 +188,7 @@ func (s *Scheduler) Reconcile(fedPref *fedschedulingv1a1.ReplicaSchedulingPrefer
 		return StatusError
 	}
 
-	err = s.ReconcileFederationTargets(s.fedClient, qualifiedName, fedPref.Kind, result)
+	err = s.ReconcileFederationTargets(s.fedClient, qualifiedName, kind, result)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("Failed to reconcile Federation Targets for RSP named %q: %v", key, err))
 		return StatusError
@@ -232,7 +234,7 @@ func (s *Scheduler) GetSchedulingResult(fedPref *fedschedulingv1a1.ReplicaSchedu
 	key := qualifiedName.String()
 
 	objectGetter := func(clusterName, key string) (interface{}, bool, error) {
-		return s.plugins[fedPref.Kind].targetInformer.GetTargetStore().GetByKey(clusterName, key)
+		return s.plugins[fedPref.Spec.PreferenceTargetRef.Kind].targetInformer.GetTargetStore().GetByKey(clusterName, key)
 	}
 	podsGetter := func(clusterName string, unstructuredObj *unstructured.Unstructured) (pkgruntime.Object, error) {
 		client, err := s.podInformer.GetClientForCluster(clusterName)

@@ -54,10 +54,11 @@ type Plugin struct {
 
 func NewPlugin(apiResource *metav1.APIResource, fedClient fedclientset.Interface, kubeClient kubeclientset.Interface, crClient crclientset.Interface, federationEventHandler, clusterEventHandler func(pkgruntime.Object), handlers *util.ClusterLifecycleHandlerFuncs) *Plugin {
 	var adapter SchedulerAdapter
+
 	switch apiResource.Kind {
-	case "Deployment":
+	case Deployment:
 		adapter = NewDeploymentAdapter(fedClient)
-	case "ReplicaSet":
+	case Replicaset:
 
 	}
 
