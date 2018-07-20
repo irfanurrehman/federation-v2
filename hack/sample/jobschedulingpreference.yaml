@@ -1,0 +1,6 @@
+apiVersion: scheduling.federation.k8s.io/v1alpha1
+kind: JobSchedulingPreference
+metadata:
+  name: jobschedulingpreference-example
+spec:
+  foo: bar
