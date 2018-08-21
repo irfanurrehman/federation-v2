@@ -148,3 +148,16 @@ func (p *Plugin) TemplateExists(key string) bool {
 	}
 	return exist
 }
+
+func (p *Plugin) ReadyClusterNames() ([]string, error) {
+	clusters, err := p.targetInformer.GetReadyClusters()
+	if err != nil {
+		return nil, err
+	}
+	clusterNames := []string{}
+	for _, cluster := range clusters {
+		clusterNames = append(clusterNames, cluster.Name)
+	}
+
+	return clusterNames, nil
+}
