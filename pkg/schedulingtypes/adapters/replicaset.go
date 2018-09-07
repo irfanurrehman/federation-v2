@@ -17,6 +17,8 @@ limitations under the License.
 package adapters
 
 import (
+	"fmt"
+
 	fedv1a1 "github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1"
 	fedclientset "github.com/kubernetes-sigs/federation-v2/pkg/client/clientset/versioned"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
@@ -105,7 +107,12 @@ func (d *FederatedReplicaSetAdapter) ReconcilePlacement(fedClient fedclientset.I
 	return nil
 }
 
-func (d *FederatedReplicaSetAdapter) ReconcileOverride(fedClient fedclientset.Interface, qualifiedName util.QualifiedName, result map[string]int64) error {
+func (d *FederatedReplicaSetAdapter) ReconcileOverride(fedClient fedclientset.Interface, qualifiedName util.QualifiedName, untypedResult interface{}) error {
+	result, ok := untypedResult.(map[string]int64)
+	if !ok {
+		return fmt.Errorf("Wrong result type passed in FederatedReplicaSetAdapter for %s", qualifiedName)
+	}
+
 	override, err := fedClient.CoreV1alpha1().FederatedReplicaSetOverrides(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {

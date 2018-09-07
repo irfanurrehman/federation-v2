@@ -17,6 +17,7 @@ limitations under the License.
 package adapters
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 
@@ -108,7 +109,12 @@ func (d *FederatedDeploymentAdapter) ReconcilePlacement(fedClient fedclientset.I
 	return nil
 }
 
-func (d *FederatedDeploymentAdapter) ReconcileOverride(fedClient fedclientset.Interface, qualifiedName util.QualifiedName, result map[string]int64) error {
+func (d *FederatedDeploymentAdapter) ReconcileOverride(fedClient fedclientset.Interface, qualifiedName util.QualifiedName, untypedResult interface{}) error {
+	result, ok := untypedResult.(map[string]int64)
+	if !ok {
+		return fmt.Errorf("Wrong result type passed in FederatedDeploymentAdapter for %s", qualifiedName)
+	}
+
 	override, err := fedClient.CoreV1alpha1().FederatedDeploymentOverrides(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {

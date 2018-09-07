@@ -38,5 +38,5 @@ type Adapter interface {
 	PlacementWatch(namespace string, options metav1.ListOptions) (watch.Interface, error)
 
 	ReconcilePlacement(fedClient fedclientset.Interface, qualifiedName QualifiedName, newClusterNames []string) error
-	ReconcileOverride(fedClient fedclientset.Interface, qualifiedName QualifiedName, result map[string]int64) error
+	ReconcileOverride(fedClient fedclientset.Interface, qualifiedName QualifiedName, untypedResult interface{}) error
 }
