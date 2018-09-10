@@ -91,12 +91,12 @@ func NewClusterControllerFixture(config *restclient.Config, fedNamespace, cluste
 	return f
 }
 
-// NewRSPControllerFixture initializes a new RSP controller fixture.
-func NewRSPControllerFixture(tl common.TestLogger, config *restclient.Config, fedNamespace, clusterNamespace, targetNamespace string) *ControllerFixture {
+// NewSchedulingControllerFixture initializes a new scheduling controller fixture.
+func NewSchedulingControllerFixture(tl common.TestLogger, config *restclient.Config, kind, fedNamespace, clusterNamespace, targetNamespace string) *ControllerFixture {
 	f := &ControllerFixture{
 		stopChan: make(chan struct{}),
 	}
-	kind := schedulingtypes.RSPKind
+
 	err := schedulingpreference.StartSchedulingPreferenceController(kind, schedulingtypes.GetSchedulerFactory(kind), config, fedNamespace, clusterNamespace, targetNamespace, f.stopChan, true)
 	if err != nil {
 		tl.Fatalf("Error starting ReplicaSchedulingPreference controller: %v", err)
