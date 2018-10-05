@@ -93,7 +93,6 @@ var (
 			Scope: "Namespaced",
 			Validation: &v1beta1.CustomResourceValidation{
 				OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
-					Type: "object",
 					Properties: map[string]v1beta1.JSONSchemaProps{
 						"apiVersion": v1beta1.JSONSchemaProps{
 							Type: "string",
@@ -105,9 +104,24 @@ var (
 							Type: "object",
 						},
 						"spec": v1beta1.JSONSchemaProps{
-							Type:       "object",
-							Properties: map[string]v1beta1.JSONSchemaProps{},
-						},
+							Type: "object",
+							Properties: map[string]v1beta1.JSONSchemaProps{
+								"clusterWeights": v1beta1.JSONSchemaProps{
+									Type: "object",
+								},
+								"totalCompletions": v1beta1.JSONSchemaProps{
+									Type:   "integer",
+									Format: "int32",
+								},
+								"totalParallellism": v1beta1.JSONSchemaProps{
+									Type:   "integer",
+									Format: "int32",
+								},
+							},
+							Required: []string{
+								"totalParallellism",
+								"totalCompletions",
+							}},
 						"status": v1beta1.JSONSchemaProps{
 							Type:       "object",
 							Properties: map[string]v1beta1.JSONSchemaProps{},

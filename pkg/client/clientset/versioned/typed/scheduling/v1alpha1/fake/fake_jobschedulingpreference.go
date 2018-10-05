@@ -62,7 +62,7 @@ func (c *FakeJobSchedulingPreferences) List(opts v1.ListOptions) (result *v1alph
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1alpha1.JobSchedulingPreferenceList{}
+	list := &v1alpha1.JobSchedulingPreferenceList{ListMeta: obj.(*v1alpha1.JobSchedulingPreferenceList).ListMeta}
 	for _, item := range obj.(*v1alpha1.JobSchedulingPreferenceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
