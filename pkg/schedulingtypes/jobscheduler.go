@@ -21,15 +21,18 @@ import (
 
 	fedschedulingv1a1 "github.com/kubernetes-sigs/federation-v2/pkg/apis/scheduling/v1alpha1"
 	fedclientset "github.com/kubernetes-sigs/federation-v2/pkg/client/clientset/versioned"
+	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
 	. "github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util/planner"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	kubeclientset "k8s.io/client-go/kubernetes"
 	crclientset "k8s.io/cluster-registry/pkg/client/clientset/versioned"
 
+	"github.com/golang/glog"
 	"github.com/kubernetes-sigs/federation-v2/pkg/schedulingtypes/adapters"
 )
 
@@ -50,9 +53,14 @@ func NewJobScheduler(fedClient fedclientset.Interface, kubeClient kubeclientset.
 	scheduler := &JobScheduler{}
 	scheduler.fedClient = fedClient
 	adapter := adapters.NewFederatedJobAdapter(fedClient)
+	tc, err := fedClient.CoreV1alpha1().FederatedTypeConfigs(util.DefaultFederationSystemNamespace).Get(JobTypeName, v1.GetOptions{})
+	if err != nil {
+		glog.Errorf("Failed to get APIResource for %s: %v", JobTypeName, err)
+	}
+	apiResource := tc.GetTarget()
 	scheduler.plugin = NewPlugin(
 		adapter,
-		JobResource,
+		&apiResource,
 		fedClient,
 		kubeClient,
 		crClient,
@@ -109,11 +117,6 @@ func (j *JobScheduler) Reconcile(obj pkgruntime.Object, qualifiedName QualifiedN
 	}
 	if len(clusterNames) == 0 {
 		// no joined clusters, nothing to do
-		return StatusAllOK
-	}
-
-	if !j.plugin.TemplateExists(qualifiedName.String()) {
-		// target FederatedTemplate does not exist, nothing to do
 		return StatusAllOK
 	}
 

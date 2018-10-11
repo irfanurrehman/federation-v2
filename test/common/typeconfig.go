@@ -26,8 +26,13 @@ import (
 
 	"github.com/kubernetes-sigs/federation-v2/pkg/apis/core/typeconfig"
 	"github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1"
+	clientset "github.com/kubernetes-sigs/federation-v2/pkg/client/clientset/versioned"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	kubeclientset "k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -81,6 +86,37 @@ func FederatedTypeConfigs() ([]typeconfig.Interface, error) {
 		typeConfigs = append(typeConfigs, obj)
 	}
 	return typeConfigs, nil
+}
+
+// EnableType enables a given type against an APIServer, if available in federatedTypes.
+// It assumes that the kubeclient and the fedclient are pointing to the same APIServer.
+func EnableType(kubeClient kubeclientset.Interface, fedClient clientset.Interface, fedType, ns string) error {
+	_, err := kubeClient.CoreV1().Namespaces().Create(&apiv1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ns,
+		},
+	})
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return fmt.Errorf("Failed to create test namespace: %s with error: %v", ns, err)
+	}
+
+	typeConfigs, err := FederatedTypeConfigs()
+	if err != nil {
+		return err
+	}
+
+	err = fmt.Errorf("Type not available in FederatedTypes")
+	for _, typeConfig := range typeConfigs {
+		typedTypeConfig := typeConfig.(*v1alpha1.FederatedTypeConfig)
+		if typedTypeConfig.Name == fedType {
+			_, err = fedClient.CoreV1alpha1().FederatedTypeConfigs(ns).Create(typedTypeConfig)
+			break
+		}
+	}
+	if err != nil && !errors.IsAlreadyExists(err) {
+		fmt.Errorf("Failed to create typeConfig for fedType: %s with error: %v", fedType, err)
+	}
+	return err
 }
 
 func typeConfigPath() string {

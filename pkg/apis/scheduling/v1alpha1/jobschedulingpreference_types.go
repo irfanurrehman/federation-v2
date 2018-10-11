@@ -26,6 +26,9 @@ type JobSchedulingPreferenceSpec struct {
 	// run at any given time.
 	// Parallelism specified in the spec for target job template will be
 	// discarded/overridden when job scheduling preferences are specified.
+	// // TODO(irfanurrehman): If needed fix up a strategy about creating jobs
+	// into federated clusters with parallelism as 0. Right now we do not
+	// create jobs in those clusters which have 0 weightage in ClusterWeights.
 	TotalParallelism int32 `json:"totalParallellism"`
 
 	// Specifies the desired number of successfully finished pods this
