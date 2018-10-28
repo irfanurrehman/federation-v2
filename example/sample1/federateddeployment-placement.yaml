@@ -8,5 +8,4 @@ items:
     namespace: test-namespace
   spec:
     clusterNames:
-    - cluster2
     - cluster1
