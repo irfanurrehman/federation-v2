@@ -101,6 +101,7 @@ func (p *Planner) Plan(availableClusters []string, currentReplicaCount map[strin
 	remainingReplicas := int64(p.preferences.Spec.TotalReplicas)
 
 	// Assign each cluster the minimum number of replicas it requested.
+	minCorrectionNeeded := false
 	for _, preference := range preferences {
 		min := minInt64(preference.MinReplicas, remainingReplicas)
 		if capacity, hasCapacity := estimatedCapacity[preference.clusterName]; hasCapacity {
@@ -108,6 +109,9 @@ func (p *Planner) Plan(availableClusters []string, currentReplicaCount map[strin
 		}
 		remainingReplicas -= min
 		plan[preference.clusterName] = min
+		if min > 0 {
+			minCorrectionNeeded = true
+		}
 	}
 
 	// This map contains information how many replicas were assigned to
@@ -157,6 +161,15 @@ func (p *Planner) Plan(availableClusters []string, currentReplicaCount map[strin
 		modified = false
 		weightSum := int64(0)
 		for _, preference := range preferences {
+			if minCorrectionNeeded {
+				// Clusters which receive higher min already need to be weight corrected
+				// such that they receive lesser replicas wrt their current actual weight
+				// from what is remaining to be distributed.
+				// The weight correction = (total replicas - thisCluster.min), so if this
+				// cluster got lesser min, gets more weightage (still keeping in  considering
+				// its actual desired weight) now.
+				weightSum += preference.Weight+(int64(p.preferences.Spec.TotalReplicas)-preference.MinReplicas)
+			}
 			weightSum += preference.Weight
 		}
 		newPreferences := make([]*namedClusterPreferences, 0, len(preferences))
@@ -167,7 +180,12 @@ func (p *Planner) Plan(availableClusters []string, currentReplicaCount map[strin
 			if weightSum > 0 {
 				start := plan[preference.clusterName]
 				// Distribute the remaining replicas, rounding fractions always up.
-				extra := (distributeInThisLoop*preference.Weight + weightSum - 1) / weightSum
+				extra := int64(0)
+				if minCorrectionNeeded {
+					extra = (distributeInThisLoop * (preference.Weight + (int64(p.preferences.Spec.TotalReplicas) - preference.MinReplicas)) + weightSum - 1) / weightSum
+				} else {
+					extra = (distributeInThisLoop * preference.Weight + weightSum - 1) / weightSum
+				}
 				extra = minInt64(extra, remainingReplicas)
 
 				// Account preallocated.
