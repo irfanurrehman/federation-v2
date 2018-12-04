@@ -49,8 +49,8 @@ const (
 )
 
 var (
-	enable_long = `
-		Enables a Kubernetes API type (including a CRD) to be propagated
+	type_long = `
+		Federates a Kubernetes API type (including a CRD) to be propagated
 		to members of a federation.  Federation primitives will be
 		generated as CRDs and a FederatedTypeConfig will be created to
 		configure a sync controller.
@@ -59,17 +59,17 @@ var (
 		the federation control plane. Please use the
 		--host-cluster-context flag otherwise.`
 
-	enable_example = `
-		# Enable federation of Services with service type overrideable
-		kubefed2 federate enable Service --override-paths=spec.type --host-cluster-context=cluster1`
+	type_example = `
+		# Federate type Services with value of field SessionAffinity overrideable
+		kubefed2 federate type Service --override-paths=spec.sessionAffinity --host-cluster-context=cluster1`
 )
 
-type enableType struct {
+type federateType struct {
 	options.SubcommandOptions
-	enableTypeOptions
+	federateTypeOptions
 }
 
-type enableTypeOptions struct {
+type federateTypeOptions struct {
 	targetName         string
 	targetVersion      string
 	rawComparisonField string
@@ -83,7 +83,7 @@ type enableTypeOptions struct {
 
 // Bind adds the join specific arguments to the flagset passed in as an
 // argument.
-func (o *enableTypeOptions) Bind(flags *pflag.FlagSet) {
+func (o *federateTypeOptions) Bind(flags *pflag.FlagSet) {
 	flags.StringVar(&o.targetVersion, "version", "", "Optional, the API version of the target type.")
 	flags.StringVar(&o.rawComparisonField, "comparison-field", string(defaultComparisonField),
 		fmt.Sprintf("The field in the target type to compare for equality. Valid values are %q (default) and %q.",
@@ -96,16 +96,16 @@ func (o *enableTypeOptions) Bind(flags *pflag.FlagSet) {
 	flags.StringVarP(&o.filename, "filename", "f", "", "If provided, the command will be configured from the provided yaml file.  Only --output wll be accepted from the command line")
 }
 
-// NewCmdFederateEnable defines the `federate enable` command that
-// enables federation of a Kubernetes API type.
-func NewCmdFederateEnable(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
-	opts := &enableType{}
+// NewCmdFederateType defines the `federate type` command that
+// federates a Kubernetes API type.
+func NewCmdFederateType(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
+	opts := &federateType{}
 
 	cmd := &cobra.Command{
-		Use:     "enable NAME",
-		Short:   "Enables propagation of a Kubernetes API type",
-		Long:    enable_long,
-		Example: enable_example,
+		Use:     "type NAME",
+		Short:   "Federates a Kubernetes API type and sets it up for propagation",
+		Long:    type_long,
+		Example: type_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := opts.Complete(args)
 			if err != nil {
@@ -127,7 +127,7 @@ func NewCmdFederateEnable(cmdOut io.Writer, config util.FedConfig) *cobra.Comman
 }
 
 // Complete ensures that options are valid and marshals them if necessary.
-func (j *enableType) Complete(args []string) error {
+func (j *federateType) Complete(args []string) error {
 	j.federateDirective = NewFederateDirective()
 	fd := j.federateDirective
 
@@ -173,7 +173,7 @@ func (j *enableType) Complete(args []string) error {
 }
 
 // Run is the implementation of the `federate enable` command.
-func (j *enableType) Run(cmdOut io.Writer, config util.FedConfig) error {
+func (j *federateType) Run(cmdOut io.Writer, config util.FedConfig) error {
 	hostConfig, err := config.HostConfig(j.HostClusterContext, j.Kubeconfig)
 	if err != nil {
 		return fmt.Errorf("Failed to get host cluster config: %v", err)

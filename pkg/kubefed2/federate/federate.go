@@ -27,7 +27,8 @@ import (
 
 var (
 	federate_long = `
-        Enables/disables propagation of Kubernetes API types (including CRDs)
+        Enables propagation of Kubernetes API types (including CRDs)
+        or a specific Kubernetes resource (including a CRD resource)
         to multiple clusters.
 
         Current context is assumed to be a Kubernetes cluster
@@ -42,7 +43,7 @@ func NewCmdFederate(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "federate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short:                 "Enable/disable propagation of Kubernetes types to multiple clusters",
+		Short:                 "Enable propagation of Kubernetes types or a specific kubernetes resource to multiple clusters",
 		Long:                  federate_long,
 		Run: func(_ *cobra.Command, args []string) {
 			if len(args) < 1 {
@@ -53,7 +54,7 @@ func NewCmdFederate(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(NewCmdFederateEnable(cmdOut, config))
+	cmd.AddCommand(NewCmdFederateType(cmdOut, config))
 	cmd.AddCommand(NewCmdFederateDisable(cmdOut, config))
 
 	return cmd
