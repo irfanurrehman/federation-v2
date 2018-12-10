@@ -14,43 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package federate
+package disable
 
 import (
 	"fmt"
 	"io"
 
 	"github.com/golang/glog"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
-	apiextv1b1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
-
-	"github.com/kubernetes-sigs/federation-v2/pkg/apis/core/typeconfig"
 	ctlutil "github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
 	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/options"
 	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/util"
+	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 )
 
 var (
-	disable_long = `
-		Disables propagation of a Kubernetes API type.  This command
-		can also optionally delete the API resources added by the enable
-		command.
+	type_long = `
+		Disables propagation of a Kubernetes API type.
+		Use "kubefed2 delete" instead if the intention is also to
+		remove the API resources added by "federate" command.
 
 		Current context is assumed to be a Kubernetes cluster hosting
 		the federation control plane. Please use the
 		--host-cluster-context flag otherwise.`
 
-	disable_example = `
-		# Disable propagation of the Service type
-		kubefed2 federate disable Service
-
-		# Disable propagation of the Service type and delete API resources
-		kubefed2 federate disable Service --delete-from-api`
+	type_example = `
+		# Disable propagation of type Service
+		kubefed2 disable type Service`
 )
 
 type disableType struct {
@@ -60,25 +51,18 @@ type disableType struct {
 
 type disableTypeOptions struct {
 	targetName string
-	delete     bool
 }
 
-// Bind adds the join specific arguments to the flagset passed in as an
-// argument.
-func (o *disableTypeOptions) Bind(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.delete, "delete-from-api", false, "Whether to remove the API resources added by 'enable'.")
-}
-
-// NewCmdFederateDisable defines the `federate disable` command that
+// NewCmdDisableType defines the `disable type` command that
 // disables federation of a Kubernetes API type.
-func NewCmdFederateDisable(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
+func NewCmdDisableType(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
 	opts := &disableType{}
 
 	cmd := &cobra.Command{
-		Use:     "disable NAME",
+		Use:     "type NAME",
 		Short:   "Disables propagation of a Kubernetes API type",
-		Long:    disable_long,
-		Example: disable_example,
+		Long:    type_long,
+		Example: type_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := opts.Complete(args)
 			if err != nil {
@@ -94,7 +78,6 @@ func NewCmdFederateDisable(cmdOut io.Writer, config util.FedConfig) *cobra.Comma
 
 	flags := cmd.Flags()
 	opts.CommonBind(flags)
-	opts.Bind(flags)
 
 	return cmd
 }
@@ -109,7 +92,7 @@ func (j *disableType) Complete(args []string) error {
 	return nil
 }
 
-// Run is the implementation of the `federate disable` command.
+// Run is the implementation of the `disable type` command.
 func (j *disableType) Run(cmdOut io.Writer, config util.FedConfig) error {
 	hostConfig, err := config.HostConfig(j.HostClusterContext, j.Kubeconfig)
 	if err != nil {
@@ -121,7 +104,7 @@ func (j *disableType) Run(cmdOut io.Writer, config util.FedConfig) error {
 		Name:      j.targetName,
 	}
 
-	err = DisableFederation(cmdOut, hostConfig, typeConfigName, j.delete, j.DryRun)
+	err = DisableTypeFederation(cmdOut, hostConfig, typeConfigName, j.DryRun)
 	if err != nil {
 		return err
 	}
@@ -129,7 +112,7 @@ func (j *disableType) Run(cmdOut io.Writer, config util.FedConfig) error {
 	return nil
 }
 
-func DisableFederation(cmdOut io.Writer, config *rest.Config, typeConfigName ctlutil.QualifiedName, delete, dryRun bool) error {
+func DisableTypeFederation(cmdOut io.Writer, config *rest.Config, typeConfigName ctlutil.QualifiedName, dryRun bool) error {
 	fedClient, err := util.FedClientset(config)
 	if err != nil {
 		return fmt.Errorf("Failed to get federation clientset: %v", err)
@@ -159,49 +142,6 @@ func DisableFederation(cmdOut io.Writer, config *rest.Config, typeConfigName ctl
 	} else {
 		write(fmt.Sprintf("Propagation already disabled for FederatedTypeConfig %q\n", typeConfigName))
 	}
-	if !delete {
-		return nil
-	}
-
-	// TODO(marun) consider waiting for the sync controller to be stopped before attempting deletion
-	deletePrimitives(config, typeConfig, write)
-	err = fedClient.CoreV1alpha1().FederatedTypeConfigs(typeConfigName.Namespace).Delete(typeConfigName.Name, nil)
-	if err != nil {
-		return fmt.Errorf("Error deleting FederatedTypeConfig %q: %v", typeConfigName, err)
-	}
-	write(fmt.Sprintf("federatedtypeconfig %q deleted\n", typeConfigName))
 
 	return nil
-}
-
-func deletePrimitives(config *rest.Config, typeConfig typeconfig.Interface, write func(string)) error {
-	client, err := apiextv1b1client.NewForConfig(config)
-	if err != nil {
-		return fmt.Errorf("Error creating crd client: %v", err)
-	}
-
-	failedDeletion := []string{}
-	crdNames := primitiveCRDNames(typeConfig)
-	for _, crdName := range crdNames {
-		err := client.CustomResourceDefinitions().Delete(crdName, nil)
-		if err != nil && !errors.IsNotFound(err) {
-			glog.Errorf("Failed to delete crd %q: %v", crdName, err)
-			failedDeletion = append(failedDeletion, crdName)
-			continue
-		}
-		write(fmt.Sprintf("customresourcedefinition %q deleted\n", crdName))
-	}
-	if len(failedDeletion) > 0 {
-		return fmt.Errorf("The following crds were not deleted successfully (see error log for details): %v", failedDeletion)
-	}
-
-	return nil
-}
-
-func primitiveCRDNames(typeConfig typeconfig.Interface) []string {
-	return []string{
-		typeconfig.GroupQualifiedName(typeConfig.GetTemplate()),
-		typeconfig.GroupQualifiedName(typeConfig.GetPlacement()),
-		typeconfig.GroupQualifiedName(typeConfig.GetOverride()),
-	}
 }

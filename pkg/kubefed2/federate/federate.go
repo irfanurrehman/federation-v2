@@ -43,7 +43,7 @@ func NewCmdFederate(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "federate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short:                 "Enable propagation of Kubernetes types or a specific kubernetes resource to multiple clusters",
+		Short:                 "Enable propagation of a Kubernetes type or a specific kubernetes resource to multiple clusters",
 		Long:                  federate_long,
 		Run: func(_ *cobra.Command, args []string) {
 			if len(args) < 1 {
@@ -55,7 +55,6 @@ func NewCmdFederate(cmdOut io.Writer, config util.FedConfig) *cobra.Command {
 	}
 
 	cmd.AddCommand(NewCmdFederateType(cmdOut, config))
-	cmd.AddCommand(NewCmdFederateDisable(cmdOut, config))
 
 	return cmd
 }
