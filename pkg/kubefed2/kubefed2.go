@@ -25,9 +25,10 @@ import (
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/delete"
+	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/disable"
 	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/federate"
 	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/util"
-	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/disable"
 )
 
 // NewKubeFed2Command creates the `kubefed2` command and its nested children.
@@ -56,6 +57,7 @@ func NewKubeFed2Command(out io.Writer) *cobra.Command {
 	fedConfig := util.NewFedConfig(clientcmd.NewDefaultPathOptions())
 	rootCmd.AddCommand(federate.NewCmdFederate(out, fedConfig))
 	rootCmd.AddCommand(disable.NewCmdDisable(out, fedConfig))
+	rootCmd.AddCommand(delete.NewCmdDelete(out, fedConfig))
 	rootCmd.AddCommand(NewCmdJoin(out, fedConfig))
 	rootCmd.AddCommand(NewCmdUnjoin(out, fedConfig))
 	rootCmd.AddCommand(NewCmdVersion(out))

@@ -21,12 +21,13 @@ import (
 	"io"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-sigs/federation-v2/pkg/apis/core/typeconfig"
+	fedclient "github.com/kubernetes-sigs/federation-v2/pkg/client/clientset/versioned"
 	ctlutil "github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
 	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/options"
 	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/util"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 )
 
 var (
@@ -104,7 +105,12 @@ func (j *disableType) Run(cmdOut io.Writer, config util.FedConfig) error {
 		Name:      j.targetName,
 	}
 
-	err = DisableTypeFederation(cmdOut, hostConfig, typeConfigName, j.DryRun)
+	fedClient, err := util.FedClientset(hostConfig)
+	if err != nil {
+		return fmt.Errorf("Failed to get federation clientset: %v", err)
+	}
+
+	_, err = DisableTypeFederation(fedClient, cmdOut, typeConfigName, j.DryRun)
 	if err != nil {
 		return err
 	}
@@ -112,36 +118,26 @@ func (j *disableType) Run(cmdOut io.Writer, config util.FedConfig) error {
 	return nil
 }
 
-func DisableTypeFederation(cmdOut io.Writer, config *rest.Config, typeConfigName ctlutil.QualifiedName, dryRun bool) error {
-	fedClient, err := util.FedClientset(config)
-	if err != nil {
-		return fmt.Errorf("Failed to get federation clientset: %v", err)
-	}
+func DisableTypeFederation(fedClient *fedclient.Clientset, cmdOut io.Writer, typeConfigName ctlutil.QualifiedName, dryRun bool) (typeconfig.Interface, error) {
 	typeConfig, err := fedClient.CoreV1alpha1().FederatedTypeConfigs(typeConfigName.Namespace).Get(typeConfigName.Name, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("Error retrieving FederatedTypeConfig %q: %v", typeConfigName, err)
+		return nil, fmt.Errorf("Error retrieving FederatedTypeConfig %q: %v", typeConfigName, err)
 	}
 
 	if dryRun {
-		return nil
-	}
-
-	write := func(data string) {
-		if cmdOut != nil {
-			cmdOut.Write([]byte(data))
-		}
+		return typeConfig, nil
 	}
 
 	if typeConfig.Spec.PropagationEnabled {
 		typeConfig.Spec.PropagationEnabled = false
 		_, err = fedClient.CoreV1alpha1().FederatedTypeConfigs(typeConfig.Namespace).Update(typeConfig)
 		if err != nil {
-			return fmt.Errorf("Error disabling propagation for FederatedTypeConfig %q: %v", typeConfigName, err)
+			return nil, fmt.Errorf("Error disabling propagation for FederatedTypeConfig %q: %v", typeConfigName, err)
 		}
-		write(fmt.Sprintf("Disabled propagation for FederatedTypeConfig %q\n", typeConfigName))
+		util.WriteString(cmdOut, fmt.Sprintf("Disabled propagation for FederatedTypeConfig %q\n", typeConfigName))
 	} else {
-		write(fmt.Sprintf("Propagation already disabled for FederatedTypeConfig %q\n", typeConfigName))
+		util.WriteString(cmdOut, fmt.Sprintf("Propagation already disabled for FederatedTypeConfig %q\n", typeConfigName))
 	}
 
-	return nil
+	return typeConfig, nil
 }

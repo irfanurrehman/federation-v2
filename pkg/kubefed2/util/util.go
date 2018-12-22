@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"io"
 
 	fedclient "github.com/kubernetes-sigs/federation-v2/pkg/client/clientset/versioned"
 	client "k8s.io/client-go/kubernetes"
@@ -125,4 +126,11 @@ func RoleName(serviceAccountName string) string {
 // account to check the health of the cluster and list nodes.
 func HealthCheckRoleName(serviceAccountName string) string {
 	return fmt.Sprintf("federation-controller-manager:healthcheck-%s", serviceAccountName)
+}
+
+// WriteString writes the data on the provided output writer (stdOut/stdIn/file/etc).
+func WriteString(cmdOut io.Writer, data string) {
+	if cmdOut != nil {
+		cmdOut.Write([]byte(data))
+	}
 }
