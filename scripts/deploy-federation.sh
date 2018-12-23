@@ -146,7 +146,7 @@ go build -o bin/kubefed2 cmd/kubefed2/kubefed2.go
 
 # Enable available types
 for filename in ./config/federatedirectives/*.yaml; do
-  ./bin/kubefed2 federate enable -f "${filename}" --federation-namespace="${NS}"
+  ./bin/kubefed2 federate type -f "${filename}" --federation-namespace="${NS}"
 done
 
 # Join the host cluster
