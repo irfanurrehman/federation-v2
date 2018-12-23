@@ -33,6 +33,7 @@ import (
 
 	fedv1a1 "github.com/kubernetes-sigs/federation-v2/pkg/apis/core/v1alpha1"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
+	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/delete"
 	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/federate"
 	"github.com/kubernetes-sigs/federation-v2/test/common"
 	"github.com/kubernetes-sigs/federation-v2/test/e2e/framework"
@@ -154,13 +155,12 @@ func validateCrdCrud(f framework.FederationFramework, targetCrdKind string, name
 		tl.Fatalf("Error creating resources to enable federation of target type %q: %v", targetAPIResource.Kind, err)
 	}
 	framework.AddCleanupAction(func() {
-		delete := true
 		dryRun := false
 		// TODO(marun) Make this more resilient so that removal of all
 		// CRDs is attempted even if the removal of any one CRD fails.
 		objectMeta := typeConfig.GetObjectMeta()
 		qualifiedName := util.QualifiedName{Namespace: f.FederationSystemNamespace(), Name: objectMeta.Name}
-		err := federate.DisableFederation(nil, hostConfig, qualifiedName, delete, dryRun)
+		err := delete.DeleteTypeFederation(nil, hostConfig, qualifiedName, dryRun)
 		if err != nil {
 			tl.Fatalf("Error disabling federation of target type %q: %v", targetAPIResource.Kind, err)
 		}
