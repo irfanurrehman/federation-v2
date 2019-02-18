@@ -30,7 +30,7 @@ import (
 	fedclientset "github.com/kubernetes-sigs/federation-v2/pkg/client/clientset/versioned"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
 	"github.com/kubernetes-sigs/federation-v2/pkg/inject"
-	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/federate"
+	kfenable "github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/enable"
 	"github.com/kubernetes-sigs/federation-v2/test/common"
 	apiv1 "k8s.io/api/core/v1"
 	apiextv1b1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -371,11 +371,11 @@ func waitForCrd(tl common.TestLogger, config *rest.Config, crd *apiextv1b1.Custo
 func federateCoreTypes(tl common.TestLogger, config *rest.Config, namespace string) []*apiextv1b1.CustomResourceDefinition {
 	crds := []*apiextv1b1.CustomResourceDefinition{}
 	for _, enableTypeDirective := range loadEnableTypeDirectives(tl) {
-		resources, err := federate.GetResources(config, enableTypeDirective)
+		resources, err := kfenable.GetResources(config, enableTypeDirective)
 		if err != nil {
 			tl.Fatalf("Error retrieving resource definitions for EnableTypeDirective %q: %v", enableTypeDirective.Name, err)
 		}
-		err = federate.CreateResources(nil, config, resources, namespace)
+		err = kfenable.CreateResources(nil, config, resources, namespace)
 		if err != nil {
 			tl.Fatalf("Error creating resources for EnableTypeDirective %q: %v", enableTypeDirective.Name, err)
 		}
@@ -383,21 +383,21 @@ func federateCoreTypes(tl common.TestLogger, config *rest.Config, namespace stri
 	}
 	return crds
 }
-func loadEnableTypeDirectives(tl common.TestLogger) []*federate.EnableTypeDirective {
+func loadEnableTypeDirectives(tl common.TestLogger) []*kfenable.EnableTypeDirective {
 	path := enableTypeDirectivesPath(tl)
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		tl.Fatalf("Error reading EnableTypeDirective resources from path %q: %v", path, err)
 	}
-	enableTypeDirectives := []*federate.EnableTypeDirective{}
+	enableTypeDirectives := []*kfenable.EnableTypeDirective{}
 	suffix := ".yaml"
 	for _, file := range files {
 		if !strings.HasSuffix(file.Name(), suffix) {
 			continue
 		}
 		filename := filepath.Join(path, file.Name())
-		obj := federate.NewEnableTypeDirective()
-		err := federate.DecodeYAMLFromFile(filename, obj)
+		obj := kfenable.NewEnableTypeDirective()
+		err := kfenable.DecodeYAMLFromFile(filename, obj)
 		if err != nil {
 			tl.Fatalf("Error loading EnableTypeDirective from file %q: %v", filename, err)
 		}
