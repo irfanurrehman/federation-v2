@@ -17,7 +17,9 @@ limitations under the License.
 package federate
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var systemMetadataFields = []string{"selfLink", "uid", "resourceVersion", "generation", "creationTimestamp", "deletionTimestamp", "deletionGracePeriodSeconds"}
@@ -27,5 +29,18 @@ func RemoveControllerSetFields(resource *unstructured.Unstructured) {
 		unstructured.RemoveNestedField(resource.Object, "metadata", field)
 		// For resources with pod template subresource (jobs, deployments, replicasets)
 		unstructured.RemoveNestedField(resource.Object, "spec", "template", "metadata", field)
+	}
+}
+
+func SetBasicMetaFields(resource *unstructured.Unstructured, apiResource metav1.APIResource, name, namespace, generateName string) {
+	resource.SetKind(apiResource.Kind)
+	gv := schema.GroupVersion{Group: apiResource.Group, Version: apiResource.Version}
+	resource.SetAPIVersion(gv.String())
+	resource.SetName(name)
+	if generateName != "" {
+		resource.SetGenerateName(generateName)
+	}
+	if apiResource.Namespaced {
+		resource.SetNamespace(namespace)
 	}
 }

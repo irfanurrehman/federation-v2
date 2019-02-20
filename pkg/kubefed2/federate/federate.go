@@ -18,7 +18,6 @@ package federate
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -224,10 +223,7 @@ func createFedResource(hostConfig *rest.Config, typeConfig *fedv1a1.FederatedTyp
 		resourceNamespace = templateNamespace
 	}
 	fedResource := &unstructured.Unstructured{}
-	fedResource.SetName(templateName)
-	fedResource.SetNamespace(resourceNamespace)
-	fedResource.SetKind(fedAPIResource.Kind)
-	fedResource.SetAPIVersion(fmt.Sprintf("%s/%s", fedAPIResource.Group, fedAPIResource.Version))
+	SetBasicMetaFields(fedResource, fedAPIResource, templateName, resourceNamespace, "")
 
 	fedkind := fedAPIResource.Kind
 	qualifiedFedName := ctlutil.NewQualifiedName(fedResource)
