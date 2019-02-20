@@ -30,6 +30,7 @@ import (
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/sync"
 	versionmanager "github.com/kubernetes-sigs/federation-v2/pkg/controller/sync/version"
 	"github.com/kubernetes-sigs/federation-v2/pkg/controller/util"
+	"github.com/kubernetes-sigs/federation-v2/pkg/kubefed2/federate"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -79,8 +80,14 @@ func NewFederatedTypeCrudTester(testLogger TestLogger, typeConfig typeconfig.Int
 	}, nil
 }
 
-func (c *FederatedTypeCrudTester) CheckLifecycle(desiredFedObject *unstructured.Unstructured) {
-	fedObject := c.CheckCreate(desiredFedObject)
+func (c *FederatedTypeCrudTester) CheckLifecycle(desiredObject *unstructured.Unstructured, overrides []interface{}) {
+	var fedObject *unstructured.Unstructured
+	if c.targetIsNamespace {
+		// TODO(irfanurrehman) : Remove separate handling for namespaces after Federate namespaces impl.
+		fedObject = c.CheckCreateSimple(desiredObject)
+	} else {
+		fedObject = c.CheckCreateUsingFederate(desiredObject, overrides)
+	}
 
 	c.CheckStatusCreated(util.NewQualifiedName(fedObject))
 
@@ -97,10 +104,10 @@ func (c *FederatedTypeCrudTester) Create(desiredFedObject *unstructured.Unstruct
 		// Federated namespace needs to have the same name as its namespace.
 		desiredFedObject.SetName(desiredFedObject.GetNamespace())
 	}
-	return c.createFedResource(c.typeConfig.GetFederatedType(), desiredFedObject)
+	return c.createResource(c.typeConfig.GetFederatedType(), desiredFedObject)
 }
 
-func (c *FederatedTypeCrudTester) createFedResource(apiResource metav1.APIResource, desiredObj *unstructured.Unstructured) *unstructured.Unstructured {
+func (c *FederatedTypeCrudTester) createResource(apiResource metav1.APIResource, desiredObj *unstructured.Unstructured) *unstructured.Unstructured {
 	namespace := desiredObj.GetNamespace()
 	kind := apiResource.Kind
 	resourceMsg := kind
@@ -108,9 +115,9 @@ func (c *FederatedTypeCrudTester) createFedResource(apiResource metav1.APIResour
 		resourceMsg = fmt.Sprintf("%s in namespace %q", resourceMsg, namespace)
 	}
 
-	c.tl.Logf("Creating new %s", resourceMsg)
+	c.tl.Logf("Creating new %s and namespace %s", resourceMsg, namespace)
 
-	client := c.fedResourceClient(apiResource)
+	client := c.resourceClient(apiResource)
 	obj, err := client.Resources(namespace).Create(desiredObj, metav1.CreateOptions{})
 	if err != nil {
 		c.tl.Fatalf("Error creating %s: %v", resourceMsg, err)
@@ -122,7 +129,7 @@ func (c *FederatedTypeCrudTester) createFedResource(apiResource metav1.APIResour
 	return obj
 }
 
-func (c *FederatedTypeCrudTester) fedResourceClient(apiResource metav1.APIResource) util.ResourceClient {
+func (c *FederatedTypeCrudTester) resourceClient(apiResource metav1.APIResource) util.ResourceClient {
 	client, err := util.NewResourceClient(c.kubeConfig, &apiResource)
 	if err != nil {
 		c.tl.Fatalf("Error creating resource client: %v", err)
@@ -130,10 +137,85 @@ func (c *FederatedTypeCrudTester) fedResourceClient(apiResource metav1.APIResour
 	return client
 }
 
-func (c *FederatedTypeCrudTester) CheckCreate(desiredFedObject *unstructured.Unstructured) *unstructured.Unstructured {
+func (c *FederatedTypeCrudTester) CheckCreateSimple(desiredFedObject *unstructured.Unstructured) *unstructured.Unstructured {
 	fedObject := c.Create(desiredFedObject)
 	c.CheckPropagation(fedObject)
 	return fedObject
+}
+
+func (c *FederatedTypeCrudTester) CheckCreateUsingFederate(targetObject *unstructured.Unstructured, overrides []interface{}) *unstructured.Unstructured {
+	createdObj := c.createResource(c.typeConfig.GetTarget(), targetObject)
+	qualifiedTypeName := util.QualifiedName{
+		Namespace: c.typeConfig.GetObjectMeta().Namespace,
+		Name:      c.typeConfig.GetObjectMeta().Name,
+	}
+	qualifiedName := util.QualifiedName{
+		Namespace: createdObj.GetNamespace(),
+		Name:      createdObj.GetName(),
+	}
+
+	c.tl.Logf("Federating Resource: %q of kind: ", qualifiedName, c.typeConfig.GetTarget().Kind)
+	err := federate.FederateResource(c.kubeConfig, qualifiedTypeName, qualifiedName)
+	if err != nil {
+		c.tl.Fatalf("Error federating the resource %q:, %v", qualifiedName, err)
+	}
+
+	fedObject, err := c.setAdditionalTestData(c.waitForFederatedResource(createdObj), overrides)
+	if err != nil {
+		c.tl.Fatalf("Error setting test overrides and placement on: %q, of kind: %s : %v", qualifiedName, c.typeConfig.GetFederatedType().Kind, err)
+	}
+
+	c.CheckPropagation(fedObject)
+	return fedObject
+}
+
+// AdditionalTestData additionally sets fixture overrides and placement clusternames which don't come from FederateResource
+func (c *FederatedTypeCrudTester) setAdditionalTestData(fedObject *unstructured.Unstructured, overrides []interface{}) (*unstructured.Unstructured, error) {
+	fedKind := c.typeConfig.GetFederatedType().Kind
+	qualifiedName := util.QualifiedName{
+		Namespace: fedObject.GetNamespace(),
+		Name:      fedObject.GetName(),
+	}
+
+	fedObject, err := c.updateObject(c.typeConfig.GetFederatedType(), fedObject, func(obj *unstructured.Unstructured) {
+		if overrides != nil {
+			err := unstructured.SetNestedField(obj.Object, overrides, util.SpecField, util.OverridesField)
+			if err != nil {
+				c.tl.Fatalf("Error updating overrides in fed obj: %q, of kind: %s : %v", qualifiedName, fedKind, err)
+			}
+		}
+		clusterNames := []string{}
+		for name := range c.testClusters {
+			clusterNames = append(clusterNames, name)
+		}
+		err := util.SetClusterNames(obj, clusterNames)
+		if err != nil {
+			c.tl.Fatalf("Error updating test clusternames in fed obj: %q, of kind: %s : %v", qualifiedName, fedKind, err)
+		}
+	})
+
+	return fedObject, err
+}
+
+func (c *FederatedTypeCrudTester) waitForFederatedResource(desiredTemplate *unstructured.Unstructured) *unstructured.Unstructured {
+	var fedObj *unstructured.Unstructured
+	fedAPIResource := c.typeConfig.GetFederatedType()
+	fedClient, err := util.NewResourceClient(c.kubeConfig, &fedAPIResource)
+	err = wait.PollImmediate(c.waitInterval, wait.ForeverTestTimeout, func() (exist bool, err error) {
+		fedObj, err = fedClient.Resources(desiredTemplate.GetNamespace()).Get(desiredTemplate.GetName(), metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	})
+
+	if err != nil {
+		c.tl.Fatalf("Error retrieving federated resource for kind: %s : %v", fedAPIResource.Kind, err)
+	}
+	return fedObj
 }
 
 func (c *FederatedTypeCrudTester) CheckUpdate(fedObject *unstructured.Unstructured) {
@@ -147,7 +229,7 @@ func (c *FederatedTypeCrudTester) CheckUpdate(fedObject *unstructured.Unstructur
 	}
 
 	c.tl.Logf("Updating %s %q", kind, qualifiedName)
-	updatedFedObject, err := c.updateFedObject(apiResource, fedObject, func(obj *unstructured.Unstructured) {
+	updatedFedObject, err := c.updateObject(apiResource, fedObject, func(obj *unstructured.Unstructured) {
 		overrides, err := util.GetOverrides(obj)
 		if err != nil {
 			c.tl.Fatalf("Error retrieving overrides for %s %q: %v", kind, qualifiedName, err)
@@ -206,7 +288,7 @@ func (c *FederatedTypeCrudTester) CheckPlacementChange(fedObject *unstructured.U
 	}
 
 	c.tl.Logf("Updating %s %q", kind, qualifiedName)
-	updatedFedObject, err := c.updateFedObject(apiResource, fedObject, func(obj *unstructured.Unstructured) {
+	updatedFedObject, err := c.updateObject(apiResource, fedObject, func(obj *unstructured.Unstructured) {
 		clusterNames, err := util.GetClusterNames(obj)
 		if err != nil {
 			c.tl.Fatalf("Error retrieving cluster names: %v", err)
@@ -238,7 +320,7 @@ func (c *FederatedTypeCrudTester) CheckDelete(fedObject *unstructured.Unstructur
 	name := qualifiedName.Name
 	namespace := qualifiedName.Namespace
 
-	client := c.fedResourceClient(apiResource)
+	client := c.resourceClient(apiResource)
 
 	c.tl.Logf("Deleting %s %q", federatedKind, qualifiedName)
 	err := client.Resources(namespace).Delete(name, &metav1.DeleteOptions{OrphanDependents: orphanDependents})
@@ -454,8 +536,8 @@ func (c *FederatedTypeCrudTester) waitForResourceDeletion(client util.ResourceCl
 	return err
 }
 
-func (c *FederatedTypeCrudTester) updateFedObject(apiResource metav1.APIResource, obj *unstructured.Unstructured, mutateResourceFunc func(*unstructured.Unstructured)) (*unstructured.Unstructured, error) {
-	client := c.fedResourceClient(apiResource)
+func (c *FederatedTypeCrudTester) updateObject(apiResource metav1.APIResource, obj *unstructured.Unstructured, mutateResourceFunc func(*unstructured.Unstructured)) (*unstructured.Unstructured, error) {
+	client := c.resourceClient(apiResource)
 	err := wait.PollImmediate(c.waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		mutateResourceFunc(obj)
 
@@ -562,7 +644,7 @@ func (c *FederatedTypeCrudTester) versionForCluster(version *fedv1a1.PropagatedV
 }
 
 func (c *FederatedTypeCrudTester) getNamespace(namespace string) *unstructured.Unstructured {
-	client := c.fedResourceClient(c.typeConfig.GetTarget())
+	client := c.resourceClient(c.typeConfig.GetTarget())
 	obj, err := client.Resources("").Get(namespace, metav1.GetOptions{})
 	if err != nil {
 		c.tl.Errorf("An unexpected error occurred while retrieving the namespace for a federated namespace: %v", err)
@@ -580,7 +662,7 @@ func (c *FederatedTypeCrudTester) CheckStatusCreated(qualifiedName util.Qualifie
 
 	c.tl.Logf("Checking creation of %s %q", statusKind, qualifiedName)
 
-	client := c.fedResourceClient(*statusAPIResource)
+	client := c.resourceClient(*statusAPIResource)
 	err := wait.PollImmediate(c.waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		_, err := client.Resources(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {

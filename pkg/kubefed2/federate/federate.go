@@ -17,7 +17,6 @@ limitations under the License.
 package federate
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/golang/glog"
@@ -213,10 +212,7 @@ func createFedResource(hostConfig *rest.Config, typeConfig *fedv1a1.FederatedTyp
 	resourceNamespace := template.GetNamespace()
 	resourceName := template.GetName()
 	fedResource := &unstructured.Unstructured{}
-	fedResource.SetName(resourceName)
-	fedResource.SetNamespace(resourceNamespace)
-	fedResource.SetKind(fedAPIResource.Kind)
-	fedResource.SetAPIVersion(fmt.Sprintf("%s/%s", fedAPIResource.Group, fedAPIResource.Version))
+	SetBasicMetaFields(fedResource, fedAPIResource, resourceName, resourceNamespace, "")
 
 	fedkind := fedAPIResource.Kind
 	qualifiedName := ctlutil.NewQualifiedName(fedResource)
