@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -141,9 +142,9 @@ func (self *ClusterClient) GetClusterHealthStatus() (*fedv1b1.KubeFedClusterStat
 
 // GetClusterZones gets the kubernetes cluster zones and region by inspecting labels on nodes in the cluster.
 func (self *ClusterClient) GetClusterZones() ([]string, string, error) {
-	nodes, err := self.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := self.GetNodes()
 	if err != nil {
-		klog.Errorf("Failed to list nodes while getting zone names: %v", err)
+		klog.Errorf("Error computing zones: %v", err)
 		return nil, "", err
 	}
 
@@ -160,6 +161,16 @@ func (self *ClusterClient) GetClusterZones() ([]string, string, error) {
 		}
 	}
 	return zones.List(), region, nil
+}
+
+func (self *ClusterClient) GetNodes() (*v1.NodeList, error) {
+	nodes, err := self.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		klog.Errorf("Failed to retrieve nodes: %v", err)
+		return nil, err
+	}
+
+	return nodes, nil
 }
 
 // Find the name of the zone in which a Node is running.

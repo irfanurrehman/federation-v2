@@ -252,6 +252,8 @@ func (cc *ClusterController) updateIndividualClusterStatus(cluster *fedv1b1.Kube
 		currentClusterStatus = cc.updateClusterZonesAndRegion(currentClusterStatus, cluster, clusterClient)
 	}
 
+	currentClusterStatus = cc.updateClusterNodes(currentClusterStatus, cluster, clusterClient)
+
 	storedData.clusterStatus = currentClusterStatus
 	cluster.Status = *currentClusterStatus
 	if err := cc.client.UpdateStatus(context.TODO(), cluster); err != nil {
@@ -323,6 +325,27 @@ func (cc *ClusterController) updateClusterZonesAndRegion(clusterStatus *fedv1b1.
 	}
 	clusterStatus.Zones = zones
 	clusterStatus.Region = &region
+	return clusterStatus
+}
+
+func (cc *ClusterController) updateClusterNodes(clusterStatus *fedv1b1.KubeFedClusterStatus, cluster *fedv1b1.KubeFedCluster,
+	clusterClient *ClusterClient) *fedv1b1.KubeFedClusterStatus {
+	if !util.IsClusterReady(clusterStatus) {
+		return clusterStatus
+	}
+
+	nodes, err := clusterClient.GetNodes()
+	if err != nil {
+		cc.RecordError(cluster, "RetrievingNodesFailed", err)
+		return clusterStatus
+	}
+
+	var nodeList []fedv1b1.Node
+	for _, node := range nodes.Items {
+		nodeList = append(nodeList, fedv1b1.Node{node.Name, node.UID, node.Status.Conditions})
+	}
+	clusterStatus.NodeList = nodeList
+
 	return clusterStatus
 }
 
