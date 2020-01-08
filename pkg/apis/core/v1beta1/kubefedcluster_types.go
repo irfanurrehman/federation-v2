@@ -19,6 +19,7 @@ package v1beta1
 import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/kubefed/pkg/apis/core/common"
 )
@@ -61,6 +62,15 @@ type LocalSecretReference struct {
 	Name string `json:"name"`
 }
 
+type Node struct {
+	// Name of a given node
+	Name string `json:"name,omitempty"`
+	// UID of the given node
+	UID types.UID `json:"uid,omitempty"`
+	// The conditions as listed in node status last queried
+	Conditions []apiv1.NodeCondition `json:"conditions,omitempty"`
+}
+
 // KubeFedClusterStatus contains information about the current status of a
 // cluster updated periodically by cluster controller.
 type KubeFedClusterStatus struct {
@@ -72,6 +82,9 @@ type KubeFedClusterStatus struct {
 	// Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'.
 	// +optional
 	Region *string `json:"region,omitempty"`
+	// NodeList is the list of names and UIDs of all the nodes in the cluster.
+	// +optional
+	NodeList []Node `json:"nodeList,omitempty"`
 }
 
 // +kubebuilder:object:root=true
