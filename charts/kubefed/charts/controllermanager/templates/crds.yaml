@@ -459,6 +459,53 @@ spec:
                 - type
                 type: object
               type: array
+            nodeList:
+              description: NodeList is the list of names and UIDs of all the nodes
+                in the cluster.
+              items:
+                properties:
+                  conditions:
+                    description: The conditions as listed in node status last queried
+                    items:
+                      description: NodeCondition contains condition information for
+                        a node.
+                      properties:
+                        lastHeartbeatTime:
+                          description: Last time we got an update on a given condition.
+                          format: date-time
+                          type: string
+                        lastTransitionTime:
+                          description: Last time the condition transit from one status
+                            to another.
+                          format: date-time
+                          type: string
+                        message:
+                          description: Human readable message indicating details about
+                            last transition.
+                          type: string
+                        reason:
+                          description: (brief) reason for the condition's last transition.
+                          type: string
+                        status:
+                          description: Status of the condition, one of True, False,
+                            Unknown.
+                          type: string
+                        type:
+                          description: Type of node condition.
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
+                    type: array
+                  name:
+                    description: Name of a given node
+                    type: string
+                  uid:
+                    description: UID of the given node
+                    type: string
+                type: object
+              type: array
             region:
               description: Region is the name of the region in which all of the nodes
                 in the cluster exist.  e.g. 'us-east1'.
