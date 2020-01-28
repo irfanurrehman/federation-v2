@@ -44,6 +44,7 @@ import (
 	corev1b1 "sigs.k8s.io/kubefed/pkg/apis/core/v1beta1"
 	"sigs.k8s.io/kubefed/pkg/apis/core/v1beta1/validation"
 	genericclient "sigs.k8s.io/kubefed/pkg/client/generic"
+	"sigs.k8s.io/kubefed/pkg/controller/action"
 	"sigs.k8s.io/kubefed/pkg/controller/dnsendpoint"
 	"sigs.k8s.io/kubefed/pkg/controller/federatedtypeconfig"
 	"sigs.k8s.io/kubefed/pkg/controller/ingressdns"
@@ -197,6 +198,11 @@ func startControllers(opts *options.Options, stopChan <-chan struct{}) {
 			klog.Fatalf("Error starting federated type config controller: %v", err)
 		}
 	}
+
+	if err := action.StartController(opts.Config, stopChan); err != nil {
+		klog.Fatalf("Error starting action controller: %v", err)
+	}
+
 }
 
 func getKubeFedConfig(opts *options.Options) *corev1b1.KubeFedConfig {
