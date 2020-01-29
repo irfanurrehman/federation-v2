@@ -27,6 +27,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
@@ -78,6 +79,9 @@ type FederatedReadOnlyStore interface {
 type RegisteredClustersView interface {
 	// GetClientForCluster returns a client for the cluster, if present.
 	GetClientForCluster(clusterName string) (generic.Client, error)
+
+	// GetClientForCluster returns a client for the cluster, if present.
+	GetDynamicClientForCluster(clusterName string) (dynamic.Interface, error)
 
 	// GetUnreadyClusters returns a list of all clusters that are not ready yet.
 	GetUnreadyClusters() ([]*fedv1b1.KubeFedCluster, error)
@@ -164,9 +168,10 @@ func NewFederatedInformer(
 			restclient.AddUserAgent(clusterConfig, userAgentName)
 			return clusterConfig, nil
 		},
-		targetInformers: make(map[string]informer),
-		fedNamespace:    config.KubeFedNamespace,
-		clusterClients:  make(map[string]generic.Client),
+		targetInformers:       make(map[string]informer),
+		fedNamespace:          config.KubeFedNamespace,
+		clusterClients:        make(map[string]generic.Client),
+		dynamicClusterClients: make(map[string]dynamic.Interface),
 	}
 
 	getClusterData := func(name string) []interface{} {
@@ -283,6 +288,9 @@ type federatedInformerImpl struct {
 	// Caches cluster clients (reduces client discovery and secret retrieval)
 	clusterClients map[string]generic.Client
 
+	// Caches cluster clients (reduces client discovery and secret retrieval)
+	dynamicClusterClients map[string]dynamic.Interface
+
 	// Namespace from which to source KubeFedCluster resources
 	fedNamespace string
 }
@@ -337,6 +345,27 @@ func (f *federatedInformerImpl) GetClientForCluster(clusterName string) (generic
 		return client, err
 	}
 	f.clusterClients[clusterName] = client
+	return client, nil
+}
+
+// GetDynamicClientForCluster returns a dynamic client for the cluster, if present.
+func (f *federatedInformerImpl) GetDynamicClientForCluster(clusterName string) (dynamic.Interface, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	// return cached dynamic client if one exists (to prevent frequent secret retrieval and rest discovery)
+	if client, ok := f.dynamicClusterClients[clusterName]; ok {
+		return client, nil
+	}
+	config, err := f.getConfigForClusterUnlocked(clusterName)
+	if err != nil {
+		return nil, errors.Wrap(err, "Client creation failed")
+	}
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return client, err
+	}
+	f.dynamicClusterClients[clusterName] = client
 	return client, nil
 }
 
