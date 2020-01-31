@@ -1242,4 +1242,121 @@ status:
   conditions: []
   storedVersions: []
 ---
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    "helm.sh/hook": crd-install
+  creationTimestamp: null
+  name: actions.turbo.kubefed.io
+spec:
+  group: turbo.kubefed.io
+  names:
+    kind: Action
+    listKind: ActionList
+    plural: actions
+    singular: action
+  scope: ""
+  validation:
+    openAPIV3Schema:
+      description: Action is the Schema for the actions API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: ActionSpec defines the desired state of Action
+          properties:
+            actionType:
+              description: 'ActionType specifies the type of action to be performed
+                on the target resource. Currently only supported type will be "move".
+                An empty value will be considered as "move". TODO: Use these values
+                from turbo sdk if need be'
+              type: string
+            clusters:
+              description: Clusters specifies the source and destination cluster names
+                as registered with kubefed.
+              properties:
+                destination:
+                  type: string
+                source:
+                  type: string
+              type: object
+            targetNode:
+              description: TargetNode is an optional name of the node in target cluster
+                to be used for the move action.
+              type: string
+            targetRef:
+              description: 'TargetRef can be used instead of selector and ComponentGroupKinds
+                to identify a single specific resource. TODO: TargetRef will be used
+                and selector discarded if both selector and TargetRef are specified.'
+              properties:
+                apiVersion:
+                  description: API version of the target.
+                  type: string
+                kind:
+                  description: 'Kind of the target; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"'
+                  type: string
+                name:
+                  description: 'Name of the target; More info: http://kubernetes.io/docs/user-guide/identifiers#names'
+                  type: string
+                namespace:
+                  description: Namespace of the target.
+                  type: string
+              required:
+              - kind
+              - name
+              - namespace
+              type: object
+          required:
+          - clusters
+          - targetRef
+          type: object
+        status:
+          description: ActionStatus defines the observed state of Action
+          properties:
+            completionTime:
+              description: Represents time when the Action was completed or it determined
+                failed by the Action controller. It is represented in RFC3339 form
+                and is in UTC.
+              format: date-time
+              type: string
+            condition:
+              description: Condition represents the present state the Action is currently
+                in.
+              type: string
+            message:
+              description: Message optionally provides a human readable message especially
+                for failure.
+              type: string
+            startTime:
+              description: Represents time when the Action was acknowledged by the
+                Action controller. It is represented in RFC3339 form and is in UTC.
+              format: date-time
+              type: string
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
 {{ end }}
